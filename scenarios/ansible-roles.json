@@ -1,0 +1,12 @@
+{
+  "name": "Ansible Roles & Collections",
+  "description": "Creating and using roles, ansible-galaxy, collections, content management",
+  "category": "rhce",
+  "completion_type": "manual",
+  "vms": {
+    "control": {"cpus": 2, "memory": "2GiB", "disk": "20GiB", "role": "control"},
+    "server1": {"cpus": 1, "memory": "1GiB", "disk": "10GiB", "role": "node"},
+    "server2": {"cpus": 1, "memory": "1GiB", "disk": "10GiB", "role": "node"},
+    "server3": {"cpus": 1, "memory": "1GiB", "disk": "10GiB", "role": "node"}
+  }
+}

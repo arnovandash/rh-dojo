@@ -1,0 +1,38 @@
+# Lima template for an Ansible managed node.
+# {{PLACEHOLDER}} values are substituted by lab.sh at launch time.
+
+images:
+- location: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-41-1.4.aarch64.qcow2"
+  arch: "aarch64"
+
+cpus: {{CPUS}}
+memory: "{{MEMORY}}"
+disk: "{{DISK}}"
+
+ssh:
+  localPort: {{SSH_PORT}}
+
+provision:
+- mode: system
+  script: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # Root SSH key
+    mkdir -p /root/.ssh
+    chmod 700 /root/.ssh
+    echo '{{SSH_PUBKEY}}' > /root/.ssh/authorized_keys
+    chmod 600 /root/.ssh/authorized_keys
+
+    # SSH config: key-only root login
+    cat > /etc/ssh/sshd_config.d/99-rh-dojo.conf <<'SSHD'
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+SSHD
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null || true
+
+    # Python for Ansible (minimal — no ansible-core, that's on the control node)
+    dnf install -y python3 python3-libselinux vim
+    dnf install -y systemd-container 2>/dev/null || true    # systemd-nspawn for containers
+
+    echo "Node ready."

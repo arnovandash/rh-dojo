@@ -1,0 +1,52 @@
+# Lima template for an Ansible control node.
+# {{PLACEHOLDER}} values are substituted by lab.sh at launch time.
+#
+# Fedora aarch64 — RHEL's upstream. Same dnf, systemd, firewalld, SELinux, podman.
+
+images:
+- location: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-41-1.4.aarch64.qcow2"
+  arch: "aarch64"
+
+cpus: {{CPUS}}
+memory: "{{MEMORY}}"
+disk: "{{DISK}}"
+
+ssh:
+  localPort: {{SSH_PORT}}
+
+provision:
+- mode: system
+  script: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # Root SSH: authorized key
+    mkdir -p /root/.ssh
+    chmod 700 /root/.ssh
+    echo '{{SSH_PUBKEY}}' > /root/.ssh/authorized_keys
+    chmod 600 /root/.ssh/authorized_keys
+
+    # Root SSH: private key (for inter-node connectivity)
+    echo '{{SSH_PRIVKEY_B64}}' | base64 -d > /root/.ssh/id_ed25519
+    chmod 600 /root/.ssh/id_ed25519
+
+    # SSH daemon config
+    cat > /etc/ssh/sshd_config.d/99-rh-dojo.conf <<'SSHD'
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+SSHD
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null || true
+
+    # Ansible
+    dnf install -y ansible-core python3-pip vim git curl wget sshpass
+    pip3 install --upgrade pip 2>/dev/null || true
+
+    mkdir -p /etc/ansible
+    cat > /etc/ansible/ansible.cfg <<'ANSIBLE'
+[defaults]
+host_key_checking = False
+inventory = /root/inventory
+interpreter_python = /usr/bin/python3
+ANSIBLE
+
+    echo "Control node ready."

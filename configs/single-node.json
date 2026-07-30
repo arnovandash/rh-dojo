@@ -1,0 +1,7 @@
+{
+  "name": "Single Node",
+  "description": "One standalone Fedora VM for general practice",
+  "vms": {
+    "fedora1": {"cpus": 2, "memory": "2GiB", "disk": "20GiB", "role": "standalone"}
+  }
+}

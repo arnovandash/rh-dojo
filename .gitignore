@@ -1,0 +1,5 @@
+# Rendered Lima configs
+.rendered/
+
+# macOS
+.DS_Store

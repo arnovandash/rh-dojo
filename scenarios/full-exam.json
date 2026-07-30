@@ -1,0 +1,14 @@
+{
+  "name": "Full RHCE Exam Simulation",
+  "description": "5-hour timed practice: Ansible automation across 4 managed nodes",
+  "category": "rhce",
+  "completion_type": "manual",
+  "completion_check": "completions/full-exam.sh",
+  "vms": {
+    "control": {"cpus": 2, "memory": "2GiB", "disk": "20GiB", "role": "control"},
+    "server1": {"cpus": 1, "memory": "1GiB", "disk": "10GiB", "role": "node"},
+    "server2": {"cpus": 1, "memory": "1GiB", "disk": "10GiB", "role": "node"},
+    "server3": {"cpus": 1, "memory": "1GiB", "disk": "10GiB", "role": "node"},
+    "server4": {"cpus": 1, "memory": "1GiB", "disk": "10GiB", "role": "node"}
+  }
+}
