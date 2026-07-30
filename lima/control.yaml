@@ -1,11 +1,10 @@
 # Lima template for an Ansible control node.
 # {{PLACEHOLDER}} values are substituted by lab.sh at launch time.
-#
-# Fedora aarch64 — RHEL's upstream. Same dnf, systemd, firewalld, SELinux, podman.
 
 images:
-- location: "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-41-1.4.aarch64.qcow2"
-  arch: "aarch64"
+- location: "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/aarch64/images/Fedora-Cloud-Base-Generic-44-1.7.aarch64.qcow2"
+  arch: aarch64
+  digest: "sha256:55c60a3b80d3616a08705afd0459e75fe9f03c54aba7a46e4002a41a72fa0d5b"
 
 cpus: {{CPUS}}
 memory: "{{MEMORY}}"
@@ -13,6 +12,10 @@ disk: "{{DISK}}"
 
 ssh:
   localPort: {{SSH_PORT}}
+
+containerd:
+  system: false
+  user: false
 
 provision:
 - mode: system
@@ -30,11 +33,12 @@ provision:
     echo '{{SSH_PRIVKEY_B64}}' | base64 -d > /root/.ssh/id_ed25519
     chmod 600 /root/.ssh/id_ed25519
 
-    # SSH daemon config
-    cat > /etc/ssh/sshd_config.d/99-rh-dojo.conf <<'SSHD'
-PermitRootLogin prohibit-password
-PubkeyAuthentication yes
-SSHD
+    # SSH daemon: key-only root login
+    cat > /etc/ssh/sshd_config.d/99-rh-dojo.conf <<"SSHD"
+    PermitRootLogin prohibit-password
+    PubkeyAuthentication yes
+    SSHD
+    sed -i 's/^    //' /etc/ssh/sshd_config.d/99-rh-dojo.conf
     systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null || true
 
     # Ansible
@@ -42,11 +46,12 @@ SSHD
     pip3 install --upgrade pip 2>/dev/null || true
 
     mkdir -p /etc/ansible
-    cat > /etc/ansible/ansible.cfg <<'ANSIBLE'
-[defaults]
-host_key_checking = False
-inventory = /root/inventory
-interpreter_python = /usr/bin/python3
-ANSIBLE
+    cat > /etc/ansible/ansible.cfg <<"ANSIBLE"
+    [defaults]
+    host_key_checking = False
+    inventory = /root/inventory
+    interpreter_python = /usr/bin/python3
+    ANSIBLE
+    sed -i 's/^    //' /etc/ansible/ansible.cfg
 
     echo "Control node ready."

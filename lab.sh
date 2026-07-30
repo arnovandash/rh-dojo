@@ -33,9 +33,9 @@ else
   _BOLD=""; _DIM=""; _RED=""; _GRN=""; _YEL=""; _CYN=""; _RST=""
 fi
 
-# box chars
-_H="─"; _V="│"; _TL="┌"; _TR="┐"; _BL="└"; _BR="┘"
-_CL="├"; _CR="┤"; _TCB="┬"; _BCB="┴"; _CS="┼"
+# box chars — ASCII-only to avoid terminal font width issues with Unicode box drawing
+_H="-"; _V="|"; _TL="+"; _TR="+"; _BL="+"; _BR="+"
+_CL="+"; _CR="+"; _TCB="+"; _BCB="+"; _CS="+"
 
 # ── helpers ──────────────────────────────────────────────────────────────
 die() { printf '%b\n' "${_RED}error: $*${_RST}" >&2; exit 1; }
@@ -112,7 +112,10 @@ data = json.load(open('$file'))
 parts = '$key'.split('.')
 for p in parts:
     data = data[p]
-print(data)
+if isinstance(data, (dict, list)):
+    print(json.dumps(data))
+else:
+    print(data)
 "
 }
 
@@ -139,9 +142,12 @@ lima_status() {
   limactl list --format json 2>/dev/null \
     | /usr/bin/python3 -c "
 import json, sys
-data = json.load(sys.stdin)
 name = sys.argv[1]
-for inst in data:
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    inst = json.loads(line)
     if inst.get('name') == name:
         print(inst.get('status', 'unknown'))
         sys.exit(0)
@@ -153,9 +159,12 @@ lima_ssh_port() {
   limactl list --format json 2>/dev/null \
     | /usr/bin/python3 -c "
 import json, sys
-data = json.load(sys.stdin)
 name = sys.argv[1]
-for inst in data:
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    inst = json.loads(line)
     if inst.get('name') == name:
         port = inst.get('sshLocalPort', 0)
         print(port or 0)
@@ -232,7 +241,7 @@ PY
   echo "  launching $_CYN$inst_name$_RST ($cpus cpu / $mem / $disk, port $lima_port) ..."
 
   # Run synchronously — we wait for SSH below anyway.
-  if ! limactl start --name="$inst_name" --tty=false "$rendered" >/dev/null 2>&1; then
+  if ! limactl start --name="$inst_name" --tty=false "$rendered" 2>&1; then
     echo "  ${_RED}limactl start failed${_RST}"
     return 1
   fi
@@ -440,21 +449,26 @@ box_bot() {
   printf '%b\n' "$_BR$_RST"
 }
 
+# Strip ANSI escape sequences for accurate width calculation
+_strip_ansi() { printf '%s' "$1" | sed $'s/\033\[[0-9;]*m//g; s/\033[()][A-Za-z0-9]//g'; }
+
 box_line() {
   local width="${1:-42}" text="${2:-}"
+  local clean; clean="$(_strip_ansi "$text")"
   printf '%b' "$_CYN$_V$_RST"
-  printf ' %s' "$text"
-  printf '%*s' "$((width - ${#text} - 3))" ''
+  printf ' %b' "$text"
+  printf '%*s' "$((width - ${#clean} - 3))" ''
   printf '%b\n' "$_CYN$_V$_RST"
 }
 
 box_line_center() {
   local width="${1:-42}" text="${2:-}"
-  local pad_left=$(( (width - ${#text} - 2) / 2 ))
-  local pad_right=$(( width - 2 - ${#text} - pad_left ))
+  local clean; clean="$(_strip_ansi "$text")"
+  local pad_left=$(( (width - ${#clean} - 2) / 2 ))
+  local pad_right=$(( width - 2 - ${#clean} - pad_left ))
   printf '%b' "$_CYN$_V$_RST"
   printf '%*s' "$pad_left" ''
-  printf '%s' "$text"
+  printf '%b' "$text"
   printf '%*s' "$pad_right" ''
   printf '%b\n' "$_CYN$_V$_RST"
 }
@@ -471,7 +485,7 @@ comp_icon() {
 }
 
 # ── menu screens ─────────────────────────────────────────────────────────
-W=50
+W=80
 
 draw_main() {
   clear
@@ -593,9 +607,8 @@ for inst_name, info in state.get('instances', {}).items():
   fi
 
   box_mid "$W"
-  if (( running_count == 0 )); then
-    box_line "$W" "$(printf '%*s' 2 '')${_BOLD}u${_RST}  Spin up VMs"
-  else
+  box_line "$W" "$(printf '%*s' 2 '')${_BOLD}u${_RST}  Spin up (launches missing VMs)"
+  if (( running_count > 0 )); then
     box_line "$W" "$(printf '%*s' 2 '')${_BOLD}s${_RST}  SSH to a VM"
     box_line "$W" "$(printf '%*s' 2 '')${_BOLD}x${_RST}  Destroy VMs"
   fi
@@ -751,21 +764,7 @@ menu_scenario() {
       b|B) return ;;
       u|U)
         # check if any VMs are already running
-        local running; running="$(/usr/bin/python3 -c "
-import json
-state = json.load(open('$STATE_FILE'))
-count = 0
-for info in state.get('instances', {}).values():
-    if info is not None and info.get('scenario') == '$id':
-        count += 1
-print(count)
-" 2>/dev/null || echo 0)"
-        if (( running > 0 )); then
-          echo "  already running. Destroy first."
-          read -r -p "  Press enter to continue...  " _
-        else
-          spin_up "$kind" "$id"
-        fi
+        spin_up "$kind" "$id"
         ;;
       s|S) draw_ssh_submenu "$id" ;;
       x|X) destroy_vms "$id" ;;
